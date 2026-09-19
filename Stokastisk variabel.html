@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<title>Stokastiske variable – gætteleg</title>
+
+<style>
+
+body{
+font-family:Arial, sans-serif;
+text-align:center;
+background:#f4f7fb;
+margin:0;
+padding:10px;
+}
+
+h2{
+margin-bottom:10px;
+}
+
+#diceContainer{
+display:flex;
+justify-content:center;
+gap:25px;
+margin:25px;
+}
+
+.die{
+width:70px;
+height:70px;
+border:2px solid #333;
+border-radius:12px;
+display:grid;
+grid-template-columns:repeat(3,1fr);
+grid-template-rows:repeat(3,1fr);
+padding:8px;
+background:white;
+box-shadow:0 2px 6px rgba(0,0,0,0.15);
+}
+
+.dot{
+width:12px;
+height:12px;
+border-radius:50%;
+background:black;
+justify-self:center;
+align-self:center;
+opacity:0;
+}
+
+button{
+font-size:15px;
+padding:6px 14px;
+margin:6px;
+border-radius:6px;
+border:1px solid #777;
+background:#ffffff;
+cursor:pointer;
+transition:0.2s;
+min-width:70px;
+}
+
+button:hover{
+background:#e6eef8;
+}
+
+table{
+margin:auto;
+border-collapse:collapse;
+margin-top:15px;
+background:white;
+box-shadow:0 3px 8px rgba(0,0,0,0.15);
+}
+
+th{
+background:#e8eef7;
+}
+
+td,th{
+border:1px solid #bbb;
+padding:10px 14px;
+}
+
+.valueCell{
+font-size:18px;
+font-weight:bold;
+width:80px;
+}
+
+.explanation{
+width:280px;
+position:relative;
+padding:10px;
+overflow:hidden;
+}
+
+/* selve lågen */
+
+.explanation::before{
+content:"";
+position:absolute;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(230,236,243,0.92);
+backdrop-filter:blur(4px);
+transition:transform 0.4s ease;
+z-index:1;
+}
+
+/* lås */
+
+.explanation::after{
+content:"🔒";
+position:absolute;
+right:10px;
+top:50%;
+transform:translateY(-50%);
+font-size:16px;
+z-index:2;
+}
+
+/* når lågen er lukket */
+
+.lid::before{
+transform:translateX(0);
+}
+
+/* når lågen åbnes */
+
+.explanation:not(.lid)::before{
+transform:translateX(100%);
+}
+
+.explanation:not(.lid)::after{
+opacity:0;
+}
+
+@media (max-height:800px){
+
+.die{
+width:60px;
+height:60px;
+padding:6px;
+}
+
+.dot{
+width:10px;
+height:10px;
+}
+
+.valueCell{
+font-size:16px;
+}
+
+td,th{
+padding:6px 10px;
+}
+
+}
+</style>
+</head>
+<body>
+
+<h2>Gæt den stokastiske variabel</h2>
+
+<button id="rollButton">Kast terninger</button>
+
+<div id="diceContainer"></div>
+
+<table id="resultTable">
+<tr>
+<th>Resultat</th>
+<th></th>
+<th>Forklaring</th>
+</tr>
+</table>
+
+<script>
+
+// terningmønstre
+const dicePatterns={
+1:[4],
+2:[0,8],
+3:[0,4,8],
+4:[0,2,6,8],
+5:[0,2,4,6,8],
+6:[0,2,3,5,6,8]
+};
+
+const diceContainer=document.getElementById("diceContainer");
+
+let dice=[];
+
+// opret 2 terninger
+for(let i=0;i<2;i++){
+
+let die=document.createElement("div");
+die.classList.add("die");
+
+let dots=[];
+
+for(let j=0;j<9;j++){
+let dot=document.createElement("div");
+dot.classList.add("dot");
+die.appendChild(dot);
+dots.push(dot);
+}
+
+diceContainer.appendChild(die);
+
+dice.push({element:die,dots:dots});
+}
+
+// vis terning
+function showDice(die,value){
+
+die.dots.forEach(d=>d.style.opacity=0);
+
+dicePatterns[value].forEach(i=>{
+die.dots[i].style.opacity=1;
+});
+}
+
+// stokastiske variable
+const variables=[
+
+{name:"Summen af terningerne", func:(a,b)=>a+b},
+
+{name:"Produktet af terningerne", func:(a,b)=>a*b},
+
+{name:"Differensen (|a-b|)", func:(a,b)=>Math.abs(a-b)},
+
+{name:"Den laveste terning", func:(a,b)=>Math.min(a,b)},
+
+{name:"Den højeste terning", func:(a,b)=>Math.max(a,b)},
+
+{name:"Antal lige terninger", func:(a,b)=>(a%2==0)+(b%2==0)},
+
+{name:"Antal ulige terninger", func:(a,b)=>(a%2==1)+(b%2==1)},
+
+{name:"10 hvis terningerne er ens ellers 0", func:(a,b)=>(a===b?10:0)},
+
+{name:"Terningerne læst som et tocifret tal", func:(a,b)=>a*10+b},
+
+{name:"1 hvis summen er over 6 ellers 0", func:(a,b)=>((a+b)>6?1:0)}
+
+];
+
+// opret tabel
+
+const table=document.getElementById("resultTable");
+
+variables.forEach((v,i)=>{
+
+let row=document.createElement("tr");
+
+row.innerHTML=`
+<td id="value${i}" class="valueCell"></td>
+<td><button onclick="toggleReveal(${i})" id="btn${i}">Vis</button></td>
+<td id="name${i}" class="explanation lid">${v.name}</td>
+`;
+
+table.appendChild(row);
+
+});
+
+// vis / skjul forklaring
+
+function toggleReveal(i){
+
+let cell=document.getElementById("name"+i);
+let btn=document.getElementById("btn"+i);
+
+if(cell.classList.contains("lid")){
+cell.classList.remove("lid");
+btn.textContent="Skjul";
+}
+else{
+cell.classList.add("lid");
+btn.textContent="Vis";
+}
+
+}
+
+// kast
+
+function rollDice(){
+
+let a=Math.floor(Math.random()*6)+1;
+let b=Math.floor(Math.random()*6)+1;
+
+showDice(dice[0],a);
+showDice(dice[1],b);
+
+// opdater værdier
+variables.forEach((v,i)=>{
+let value=v.func(a,b);
+document.getElementById("value"+i).textContent=value;
+});
+
+}
+
+document.getElementById("rollButton").addEventListener("click",rollDice);
+
+</script>
+
+</body>
+</html>
